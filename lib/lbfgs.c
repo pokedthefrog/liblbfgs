@@ -128,7 +128,7 @@ typedef int (*line_search_proc)(
     lbfgsfloatval_t *stp,
     const lbfgsfloatval_t* xp,
     const lbfgsfloatval_t* gp,
-    lbfgsfloatval_t *wa,
+    lbfgsfloatval_t *wp,
     callback_data_t *cd,
     const lbfgs_parameter_t *param
     );
@@ -142,7 +142,7 @@ static int line_search_backtracking(
     lbfgsfloatval_t *stp,
     const lbfgsfloatval_t* xp,
     const lbfgsfloatval_t* gp,
-    lbfgsfloatval_t *wa,
+    lbfgsfloatval_t *wp,
     callback_data_t *cd,
     const lbfgs_parameter_t *param
     );
@@ -170,7 +170,7 @@ static int line_search_morethuente(
     lbfgsfloatval_t *stp,
     const lbfgsfloatval_t* xp,
     const lbfgsfloatval_t* gp,
-    lbfgsfloatval_t *wa,
+    lbfgsfloatval_t *wp,
     callback_data_t *cd,
     const lbfgs_parameter_t *param
     );
@@ -938,13 +938,13 @@ static int line_search_morethuente(
     lbfgsfloatval_t *stp,
     const lbfgsfloatval_t* xp,
     const lbfgsfloatval_t* gp,
-    lbfgsfloatval_t *wa,
+    lbfgsfloatval_t *wp,
     callback_data_t *cd,
     const lbfgs_parameter_t *param
     )
 {
     (void)gp;
-    (void)wa;
+    (void)wp;
 
     int count = 0;
     int brackt, stage1, uinfo = 0;
