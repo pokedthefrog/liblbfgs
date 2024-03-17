@@ -57,7 +57,7 @@ method presented in:
       Learning (ICML 2007)</i>, pp. 33-40, 2007.
 
 I would like to thank the original author, Jorge Nocedal, who has been
-distributing the effieicnt and explanatory implementation in an open source
+distributing the efficient and explanatory implementation in an open source
 licence.
 */
 
@@ -691,7 +691,7 @@ const char* lbfgs_strerror(int err)
             return "Invalid parameter lbfgs_parameter_t::linesearch specified.";
 
         case LBFGSERR_INVALID_MINSTEP:
-            return "Invalid parameter lbfgs_parameter_t::max_step specified.";
+            return "Invalid parameter lbfgs_parameter_t::min_step specified.";
 
         case LBFGSERR_INVALID_MAXSTEP:
             return "Invalid parameter lbfgs_parameter_t::max_step specified.";
@@ -1268,7 +1268,7 @@ static int update_trial_interval(
     /* Check the input parameters for errors. */
     if (*brackt) {
         if (*t <= min2(*x, *y) || max2(*x, *y) <= *t) {
-            /* The trival value t is out of the interval. */
+            /* The trial value t is out of the interval. */
             return LBFGSERR_OUTOFINTERVAL;
         }
         if (0. <= *dx * (*t - *x)) {
@@ -1322,10 +1322,10 @@ static int update_trial_interval(
             same sign, and the magnitude of the derivative decreases.
             The cubic minimizer is only used if the cubic tends to
             infinity in the direction of the minimizer or if the minimum
-            of the cubic is beyond t. Otherwise the cubic minimizer is
+            of the cubic is beyond t. Otherwise, the cubic minimizer is
             defined to be either tmin or tmax. The quadratic (secant)
             minimizer is also computed and if the minimum is brackt
-            then the the minimizer closest to x is taken, else the one
+            then the minimizer closest to x is taken, else the one
             farthest away is taken.
          */
         bound = 1;
@@ -1449,7 +1449,7 @@ static void owlqn_pseudo_gradient(
         pg[i] = g[i];
     }
 
-    /* Compute the psuedo-gradients. */
+    /* Compute the pseudo-gradients. */
     for (i = start;i < end;++i) {
         if (x[i] < 0.) {
             /* Differentiable. */

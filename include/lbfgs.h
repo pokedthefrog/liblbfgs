@@ -101,7 +101,7 @@ enum {
     LBFGSERR_INVALID_DELTA,
     /** Invalid parameter lbfgs_parameter_t::linesearch specified. */
     LBFGSERR_INVALID_LINESEARCH,
-    /** Invalid parameter lbfgs_parameter_t::max_step specified. */
+    /** Invalid parameter lbfgs_parameter_t::min_step specified. */
     LBFGSERR_INVALID_MINSTEP,
     /** Invalid parameter lbfgs_parameter_t::max_step specified. */
     LBFGSERR_INVALID_MAXSTEP,
@@ -152,7 +152,7 @@ enum {
 enum {
     /** The default algorithm (MoreThuente method). */
     LBFGS_LINESEARCH_DEFAULT = 0,
-    /** MoreThuente method proposd by More and Thuente. */
+    /** MoreThuente method proposed by More and Thuente. */
     LBFGS_LINESEARCH_MORETHUENTE = 0,
     /**
      * Backtracking method with the Armijo condition.
@@ -164,7 +164,7 @@ enum {
      *  a is the step length.
      */
     LBFGS_LINESEARCH_BACKTRACKING_ARMIJO = 1,
-    /** The backtracking method with the defualt (regular Wolfe) condition. */
+    /** The backtracking method with the default (regular Wolfe) condition. */
     LBFGS_LINESEARCH_BACKTRACKING = 2,
     /**
      * Backtracking method with regular Wolfe condition.
@@ -241,7 +241,7 @@ typedef struct {
      * The maximum number of iterations.
      *  The lbfgs() function terminates an optimization process with
      *  ::LBFGSERR_MAXIMUMITERATION status code when the iteration count
-     *  exceedes this parameter. Setting this parameter to zero continues an
+     *  exceeds this parameter. Setting this parameter to zero continues an
      *  optimization process until a convergence or error. The default value
      *  is \c 0.
      */
@@ -319,12 +319,12 @@ typedef struct {
     lbfgsfloatval_t xtol;
 
     /**
-     * Coeefficient for the L1 norm of variables.
+     * Coefficient for the L1 norm of variables.
      *  This parameter should be set to zero for standard minimization
      *  problems. Setting this parameter to a positive value activates
      *  Orthant-Wise Limited-memory Quasi-Newton (OWL-QN) method, which
      *  minimizes the objective function F(x) combined with the L1 norm |x|
-     *  of the variables, {F(x) + C |x|}. This parameter is the coeefficient
+     *  of the variables, {F(x) + C |x|}. This parameter is the coefficient
      *  for the |x|, i.e., C. As the L1 norm |x| is not differentiable at
      *  zero, the library modifies function and gradient evaluations from
      *  a client program suitably; a client program thus have only to return
@@ -352,7 +352,7 @@ typedef struct {
      *  This parameter is valid only for OWL-QN method
      *  (i.e., \ref orthantwise_c != 0). This parameter e (0 < e <= N)
      *  specifies the index number at which the library stops computing the
-     *  L1 norm of the variables x,
+     *  L1 norm of the variables x.
      */
     int             orthantwise_end;
 } lbfgs_parameter_t;
@@ -421,7 +421,7 @@ A user must implement a function compatible with ::lbfgs_evaluate_t (evaluation
 callback) and pass the pointer to the callback function to lbfgs() arguments.
 Similarly, a user can implement a function compatible with ::lbfgs_progress_t
 (progress callback) to obtain the current progress (e.g., variables, function
-value, ||G||, etc) and to cancel the iteration process if necessary.
+value, ||G||, etc.) and to cancel the iteration process if necessary.
 Implementation of a progress callback is optional: a user can pass \c NULL if
 progress notification is not necessary.
 
@@ -498,7 +498,7 @@ void lbfgs_parameter_init(lbfgs_parameter_t *param);
  * Allocate an array for variables.
  *
  *  This function allocates an array of variables for the convenience of
- *  ::lbfgs function; the function has a requreiemt for a variable array
+ *  ::lbfgs function; the function has a requirement for a variable array
  *  when libLBFGS is built with SSE/SSE2 optimization routines. A user does
  *  not have to use this function for libLBFGS built without SSE/SSE2
  *  optimization.
@@ -540,7 +540,7 @@ Broyden-Fletcher-Goldfarb-Shanno (L-BFGS) method written by Jorge Nocedal.
 The original FORTRAN source code is available at:
 http://www.ece.northwestern.edu/~nocedal/lbfgs.html
 
-The L-BFGS method solves the unconstrainted minimization problem,
+The L-BFGS method solves the unconstrained minimization problem,
 
 <pre>
     minimize F(x), x = (x1, x2, ..., xN),
@@ -670,14 +670,14 @@ libLBFGS is distributed under the term of the
       ::lbfgs_parameter_t::linesearch was added to choose either MoreThuente
       method (::LBFGS_LINESEARCH_MORETHUENTE) or backtracking algorithm
       (::LBFGS_LINESEARCH_BACKTRACKING).
-    - Fixed a bug: the previous version did not compute psuedo-gradients
+    - Fixed a bug: the previous version did not compute pseudo-gradients
       properly in the line search routines for OWL-QN. This bug might quit
       an iteration process too early when the OWL-QN routine was activated
       (0 < ::lbfgs_parameter_t::orthantwise_c).
     - Configure script for POSIX environments.
     - SSE/SSE2 optimizations with GCC.
     - New functions ::lbfgs_malloc and ::lbfgs_free to use SSE/SSE2 routines
-      transparently. It is uncessary to use these functions for libLBFGS built
+      transparently. It is unnecessary to use these functions for libLBFGS built
       without SSE/SSE2 routines; you can still use any memory allocators if
       SSE/SSE2 routines are disabled in libLBFGS.
 - Version 1.3 (2007-12-16):
@@ -739,7 +739,7 @@ Special thanks go to:
     - Kevin S. Van Horn, Nic Schraudolph, and Tamas Nepusz for bug fixes
 
 Finally I would like to thank the original author, Jorge Nocedal, who has been
-distributing the effieicnt and explanatory implementation in an open source
+distributing the efficient and explanatory implementation in an open source
 licence.
 
 @section reference Reference
