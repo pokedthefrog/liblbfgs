@@ -116,7 +116,9 @@ enum {
     /** Invalid parameter lbfgs_parameter_t::max_linesearch specified. */
     LBFGSERR_INVALID_MAXLINESEARCH,
     /** Invalid parameter lbfgs_parameter_t::orthantwise_c specified. */
-    LBFGSERR_INVALID_ORTHANTWISE,
+    LBFGSERR_INVALID_ORTHANTWISE_C,
+    /** Invalid parameter lbfgs_parameter_t::orthantwise_w specified. */
+    LBFGSERR_INVALID_ORTHANTWISE_W,
     /** Invalid parameter lbfgs_parameter_t::orthantwise_start specified. */
     LBFGSERR_INVALID_ORTHANTWISE_START,
     /** Invalid parameter lbfgs_parameter_t::orthantwise_end specified. */
@@ -332,6 +334,21 @@ typedef struct {
      *  is zero.
      */
     lbfgsfloatval_t orthantwise_c;
+
+    /**
+     * Weights for L1-regularization with differential shrinkage.
+     *  This parameter is valid only for the OWL-QN method
+     *  (i.e., \ref orthantwise_c != 0). Unless set by the user, OWL-QN
+     *  minimizes the objective function F(x) combined with the L1 norm |x|
+     *  of the variables, {F(x) + C |x|}. If set, each variable is weighted
+     *  by its corresponding weight, and the objective function becomes:
+     *      {F(x) + C |x|_w}, |x|_w := |diag(w) x| .
+     *  The length of this vector should match the number of regularized
+     *  variables, which may be less than the total, as indicated by
+     *  \ref orthantwise_start and \ref orthantwise_end. The default value is
+     *  \c NULL (no differential shrinkage applied).
+     */
+    lbfgsfloatval_t *orthantwise_w;
 
     /**
      * Start index for computing L1 norm of the variables.

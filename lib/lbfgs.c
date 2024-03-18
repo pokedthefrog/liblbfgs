@@ -114,7 +114,7 @@ static const lbfgs_parameter_t _defparam = {
     6, 1e-5, 0, 1e-5,
     0, LBFGS_LINESEARCH_DEFAULT, 40,
     1e-20, 1e20, 1e-4, 0.9, 0.9, 1.0e-16,
-    0.0, 0, -1,
+    0.0, NULL, 0, -1,
 };
 
 /* Forward function declarations. */
@@ -192,6 +192,7 @@ static int update_trial_interval(
 
 static lbfgsfloatval_t owlqn_x1norm(
     const lbfgsfloatval_t* x,
+    const lbfgsfloatval_t* w,
     const int start,
     const int n
     );
@@ -202,6 +203,7 @@ static void owlqn_pseudo_gradient(
     const lbfgsfloatval_t* g,
     const int n,
     const lbfgsfloatval_t c,
+    const lbfgsfloatval_t* w,
     const int start,
     const int end
     );
@@ -332,7 +334,7 @@ int lbfgs(
         return LBFGSERR_INVALID_MAXLINESEARCH;
     }
     if (param.orthantwise_c < 0.) {
-        return LBFGSERR_INVALID_ORTHANTWISE;
+        return LBFGSERR_INVALID_ORTHANTWISE_C;
     }
     if (param.orthantwise_start < 0 || n < param.orthantwise_start) {
         return LBFGSERR_INVALID_ORTHANTWISE_START;
@@ -364,6 +366,20 @@ int lbfgs(
             break;
         default:
             return LBFGSERR_INVALID_LINESEARCH;
+        }
+    }
+
+    int len_w = param.orthantwise_end - param.orthantwise_start;
+    if (param.orthantwise_w != NULL) {
+        for (i = 0;i < len_w;++i) {
+            if (param.orthantwise_w[i] < 0.) {
+                return LBFGSERR_INVALID_ORTHANTWISE_W;
+            }
+        }
+    } else {
+        param.orthantwise_w = (lbfgsfloatval_t*)vecalloc((size_t)len_w * sizeof(lbfgsfloatval_t));
+        for (i = 0;i < len_w;++i) {
+            param.orthantwise_w[i] = 1.0;
         }
     }
 
@@ -416,11 +432,11 @@ int lbfgs(
     fx = cd.proc_evaluate(cd.instance, x, g, cd.n, 0);
     if (0. != param.orthantwise_c) {
         /* Compute the L1 norm of the variable and add it to the object value. */
-        xnorm = owlqn_x1norm(x, param.orthantwise_start, param.orthantwise_end);
+        xnorm = owlqn_x1norm(x, param.orthantwise_w, param.orthantwise_start, param.orthantwise_end);
         fx += xnorm * param.orthantwise_c;
         owlqn_pseudo_gradient(
             pg, x, g, n,
-            param.orthantwise_c, param.orthantwise_start, param.orthantwise_end
+            param.orthantwise_c, param.orthantwise_w, param.orthantwise_start, param.orthantwise_end
             );
     }
 
@@ -473,7 +489,7 @@ int lbfgs(
             ls = linesearch(n, x, &fx, g, d, &step, xp, pg, w, &cd, &param);
             owlqn_pseudo_gradient(
                 pg, x, g, n,
-                param.orthantwise_c, param.orthantwise_start, param.orthantwise_end
+                param.orthantwise_c, param.orthantwise_w, param.orthantwise_start, param.orthantwise_end
                 );
         }
         if (ls < 0) {
@@ -634,8 +650,11 @@ lbfgs_exit:
         }
         vecfree(lm);
     }
+
+    vecfree(param.orthantwise_w);
     vecfree(pg);
     vecfree(w);
+
     vecfree(d);
     vecfree(gp);
     vecfree(g);
@@ -711,8 +730,11 @@ const char* lbfgs_strerror(int err)
         case LBFGSERR_INVALID_MAXLINESEARCH:
             return "Invalid parameter lbfgs_parameter_t::max_linesearch specified.";
 
-        case LBFGSERR_INVALID_ORTHANTWISE:
+        case LBFGSERR_INVALID_ORTHANTWISE_C:
             return "Invalid parameter lbfgs_parameter_t::orthantwise_c specified.";
+
+        case LBFGSERR_INVALID_ORTHANTWISE_W:
+            return "Invalid parameter lbfgs_parameter_t::orthantwise_w specified.";
 
         case LBFGSERR_INVALID_ORTHANTWISE_START:
             return "Invalid parameter lbfgs_parameter_t::orthantwise_start specified.";
@@ -895,7 +917,7 @@ static int line_search_backtracking_owlqn(
         *f = cd->proc_evaluate(cd->instance, x, g, cd->n, *stp);
 
         /* Compute the L1 norm of the variables and add it to the object value. */
-        norm = owlqn_x1norm(x, param->orthantwise_start, param->orthantwise_end);
+        norm = owlqn_x1norm(x, param->orthantwise_w, param->orthantwise_start, param->orthantwise_end);
         *f += norm * param->orthantwise_c;
 
         ++count;
@@ -1418,6 +1440,7 @@ static int update_trial_interval(
 
 static lbfgsfloatval_t owlqn_x1norm(
     const lbfgsfloatval_t* x,
+    const lbfgsfloatval_t* w,
     const int start,
     const int n
     )
@@ -1426,7 +1449,7 @@ static lbfgsfloatval_t owlqn_x1norm(
     lbfgsfloatval_t norm = 0.;
 
     for (i = start;i < n;++i) {
-        norm += fabs(x[i]);
+        norm += fabs(w[i-start] * x[i]);
     }
 
     return norm;
@@ -1438,6 +1461,7 @@ static void owlqn_pseudo_gradient(
     const lbfgsfloatval_t* g,
     const int n,
     const lbfgsfloatval_t c,
+    const lbfgsfloatval_t* w,
     const int start,
     const int end
     )
@@ -1453,17 +1477,17 @@ static void owlqn_pseudo_gradient(
     for (i = start;i < end;++i) {
         if (x[i] < 0.) {
             /* Differentiable. */
-            pg[i] = g[i] - c;
+            pg[i] = g[i] - w[i-start] * c;
         } else if (0. < x[i]) {
             /* Differentiable. */
-            pg[i] = g[i] + c;
+            pg[i] = g[i] + w[i-start] * c;
         } else {
             if (g[i] < -c) {
                 /* Take the right partial derivative. */
-                pg[i] = g[i] + c;
+                pg[i] = g[i] + w[i-start] * c;
             } else if (c < g[i]) {
                 /* Take the left partial derivative. */
-                pg[i] = g[i] - c;
+                pg[i] = g[i] - w[i-start] * c;
             } else {
                 pg[i] = 0.;
             }
