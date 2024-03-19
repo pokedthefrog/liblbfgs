@@ -273,8 +273,7 @@ int lbfgs(
     lbfgsfloatval_t *sk = NULL, *yk = NULL;
     lbfgsfloatval_t ys, yy, ss;
     lbfgsfloatval_t xnorm, gnorm, gpnorm, beta;
-    lbfgsfloatval_t fx = 0.;
-    lbfgsfloatval_t rate = 0.;
+    lbfgsfloatval_t fx = 0., fp, rate;
     line_search_proc linesearch = line_search_morethuente;
 
     /* Construct a callback data. */
@@ -495,9 +494,10 @@ int lbfgs(
             vec2norminv(&step, d, n);
         }
 
-        /* Store the current position and gradient vectors. */
+        /* Store the current position and gradient vectors, and fx. */
         veccpy(xp, x, n);
         veccpy(gp, g, n);
+        fp = fx;
 
         /* Search for an optimal step. */
         if (param.orthantwise_c == 0.) {
@@ -513,8 +513,29 @@ int lbfgs(
             /* Revert to the previous point. */
             veccpy(x, xp, n);
             veccpy(g, gp, n);
-            ret = ls;
-            goto lbfgs_exit;
+            fx = fp;
+
+            /*
+                Check the L-BFGS memory:
+                    - If not empty, refresh it and restart iteration.
+                    - Otherwise, exit.
+             */
+            if (k_lm > 1) {
+                k_lm = 1; end = 0;  /* Refresh memory. */
+                step = 1.0;         /* Reset step = 1. */
+
+                /* Set the steepest descent direction. */
+                if (param.orthantwise_c == 0.) {
+                    vecncpy(d, g, n);
+                } else {
+                    vecncpy(d, pg, n);
+                }
+
+                continue;
+            } else {
+                ret = ls;
+                goto lbfgs_exit;
+            }
         }
 
         /* Compute x and g norms. */
