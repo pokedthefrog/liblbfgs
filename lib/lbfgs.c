@@ -114,7 +114,7 @@ static const lbfgs_parameter_t _defparam = {
     6, 1e-5, 0, 1e-5,
     0, LBFGS_LINESEARCH_DEFAULT, 40,
     1e-20, 1e20, 1e-4, 0.9, 0.9, 1.0e-16,
-    0.0, NULL, 0, -1,
+    1e-6, 1.0, 0.0, NULL, 0, -1,
 };
 
 /* Forward function declarations. */
@@ -259,7 +259,7 @@ int lbfgs(
     )
 {
     int ret;
-    int i, j, k, ls, end, bound;
+    int i, j, k, k_lm, ls, end, bound;
     lbfgsfloatval_t step;
 
     /* Constant parameters and their default values. */
@@ -270,8 +270,9 @@ int lbfgs(
     lbfgsfloatval_t *g = NULL, *gp = NULL, *pg = NULL;
     lbfgsfloatval_t *d = NULL, *w = NULL, *pf = NULL;
     iteration_data_t *lm = NULL, *it = NULL;
-    lbfgsfloatval_t ys, yy;
-    lbfgsfloatval_t xnorm, gnorm, beta;
+    lbfgsfloatval_t *sk = NULL, *yk = NULL;
+    lbfgsfloatval_t ys, yy, ss;
+    lbfgsfloatval_t xnorm, gnorm, gpnorm, beta;
     lbfgsfloatval_t fx = 0.;
     lbfgsfloatval_t rate = 0.;
     line_search_proc linesearch = line_search_morethuente;
@@ -333,6 +334,12 @@ int lbfgs(
     if (param.max_linesearch <= 0) {
         return LBFGSERR_INVALID_MAXLINESEARCH;
     }
+    if (param.cbfgs_epsilon <= 0) {
+        return LBFGSERR_INVALID_CBFGS_EPSILON;
+    }
+    if (param.cbfgs_alpha <= 0) {
+        return LBFGSERR_INVALID_CBFGS_ALPHA;
+    }
     if (param.orthantwise_c < 0.) {
         return LBFGSERR_INVALID_ORTHANTWISE_C;
     }
@@ -389,7 +396,11 @@ int lbfgs(
     gp = (lbfgsfloatval_t*)vecalloc((size_t)n * sizeof(lbfgsfloatval_t));
     d = (lbfgsfloatval_t*)vecalloc((size_t)n * sizeof(lbfgsfloatval_t));
     w = (lbfgsfloatval_t*)vecalloc((size_t)n * sizeof(lbfgsfloatval_t));
-    if (xp == NULL || g == NULL || gp == NULL || d == NULL || w == NULL) {
+
+    sk = (lbfgsfloatval_t*)vecalloc((size_t)n * sizeof(lbfgsfloatval_t));
+    yk = (lbfgsfloatval_t*)vecalloc((size_t)n * sizeof(lbfgsfloatval_t));
+
+    if (xp == NULL || g == NULL || gp == NULL || d == NULL || w == NULL || sk == NULL || yk == NULL) {
         ret = LBFGSERR_OUTOFMEMORY;
         goto lbfgs_exit;
     }
@@ -470,14 +481,20 @@ int lbfgs(
         goto lbfgs_exit;
     }
 
-    /* Compute the initial step:
-        step = 1.0 / sqrt(vecdot(d, d, n))
-     */
-    vec2norminv(&step, d, n);
-
-    k = 1;
+    k = k_lm = 1;
     end = 0;
+    bound = 0;
     for (;;) {
+        /*
+            Compute the initial step:
+                  step = 1.0 / sqrt(vecdot(d, d, n))
+
+            Used until the first BFGS update is made.
+         */
+        if (k_lm == 1) {
+            vec2norminv(&step, d, n);
+        }
+
         /* Store the current position and gradient vectors. */
         veccpy(xp, x, n);
         veccpy(gp, g, n);
@@ -502,6 +519,8 @@ int lbfgs(
 
         /* Compute x and g norms. */
         vec2norm(&xnorm, x, n);
+
+        gpnorm = gnorm;
         if (param.orthantwise_c == 0.) {
             vec2norm(&gnorm, g, n);
         } else {
@@ -556,35 +575,58 @@ int lbfgs(
         }
 
         /*
-            Update vectors s and y:
-                s_{k+1} = x_{k+1} - x_{k} = \step * d_{k}.
-                y_{k+1} = g_{k+1} - g_{k}.
+            Compute vectors sk and yk:
+                s_{k} = x_{k+1} - x_{k} = \step * d_{k}.
+                y_{k} = g_{k+1} - g_{k}.
          */
-        it = &lm[end];
-        vecdiff(it->s, x, xp, n);
-        vecdiff(it->y, g, gp, n);
+        vecdiff(sk, x, xp, n);
+        vecdiff(yk, g, gp, n);
 
         /*
-            Compute scalars ys and yy:
+            Compute scalars ys and ss:
                 ys = y^t \cdot s = 1 / \rho.
-                yy = y^t \cdot y.
-            Notice that yy is used for scaling the hessian matrix H_0 (Cholesky factor).
+                ss = s^t \cdot s.
          */
-        vecdot(&ys, it->y, it->s, n);
-        vecdot(&yy, it->y, it->y, n);
-        it->ys = ys;
+        vecdot(&ys, yk, sk, n);
+        vecdot(&ss, sk, sk, n);
 
         /*
-            Recursive formula to compute dir = -(H \cdot g).
-                This is described in page 779 of:
-                Jorge Nocedal.
-                Updating Quasi-Newton Matrices with Limited Storage.
-                Mathematics of Computation, Vol. 35, No. 151,
-                pp. 773--782, 1980.
-         */
-        bound = (m <= k) ? m : k;
-        ++k;
-        end = (end + 1) % m;
+            Check if the cautious BFGS update rule is satisfied:
+                y^t \cdot s >= ε * ||g||^α * ||s||^2,
+            where ε > 0, α > 0, and ||.|| denotes the Euclidean (L2) norm.
+
+            If satisfied, the correction pair {sk, yk} is accepted, otherwise the
+            limited memory update is skipped.
+
+            This is described in:
+                D.-H. Li and M. Fukushima.
+                On the Global Convergence of the BFGS Method for
+                Nonconvex Unconstrained Optimization Problems.
+                SIAM Journal on Optimization, Vol. 11, No. 4, pp. 1054–1064, 2001.
+                doi: 10.1137/S1052623499354242.
+          */
+        if (ys >= param.cbfgs_epsilon * pow(gpnorm, param.cbfgs_alpha) * ss) {
+            it = &lm[end];
+            veccpy(it->s, sk, n);
+            veccpy(it->y, yk, n);
+            it->ys = ys;
+
+            bound = (m <= k_lm) ? m : k_lm;
+            ++k_lm;
+            end = (end + 1) % m;
+
+            /*
+                Compute scalar yy:
+                    yy = y^t \cdot y.
+                This is used for scaling the hessian matrix H_0 (Cholesky factor).
+             */
+            vecdot(&yy, yk, yk, n);
+        } else if (k_lm > 1) {
+            /* Use the latest accepted ys and yy. */
+            it = &lm[(end + m - 1) % m];
+            vecdot(&ys, it->y, it->s, n);
+            vecdot(&yy, it->y, it->y, n);
+        }
 
         /* Compute the steepest direction. */
         if (param.orthantwise_c == 0.) {
@@ -594,27 +636,39 @@ int lbfgs(
             vecncpy(d, pg, n);
         }
 
-        j = end;
-        for (i = 0;i < bound;++i) {
-            j = (j + m - 1) % m;    /* if (--j == -1) j = m-1; */
-            it = &lm[j];
-            /* \alpha_{j} = \rho_{j} s^{t}_{j} \cdot q_{k+1}. */
-            vecdot(&it->alpha, it->s, d, n);
-            it->alpha /= it->ys;
-            /* q_{i} = q_{i+1} - \alpha_{i} y_{i}. */
-            vecadd(d, it->y, -it->alpha, n);
-        }
+        /*
+            Recursive formula to compute dir = -(H \cdot g).
+                This is described in page 779 of:
+                Jorge Nocedal.
+                Updating Quasi-Newton Matrices with Limited Storage.
+                Mathematics of Computation, Vol. 35, No. 151,
+                pp. 773--782, 1980.
 
-        vecscale(d, ys / yy, n);
+            Skipped until the first pair {sk, yk} is accepted.
+        */
+        if (k_lm > 1) {
+            j = end;
+            for (i = 0;i < bound;++i) {
+                j = (j + m - 1) % m;   /* if (--j == -1) j = m-1; */
+                it = &lm[j];
+                /* \alpha_{j} = \rho_{j} s^{t}_{j} \cdot q_{k+1}. */
+                vecdot(&it->alpha, it->s, d, n);
+                it->alpha /= it->ys;
+                /* q_{i} = q_{i+1} - \alpha_{i} y_{i}. */
+                vecadd(d, it->y, -it->alpha, n);
+            }
 
-        for (i = 0;i < bound;++i) {
-            it = &lm[j];
-            /* \beta_{j} = \rho_{j} y^t_{j} \cdot \gamma_{i}. */
-            vecdot(&beta, it->y, d, n);
-            beta /= it->ys;
-            /* \gamma_{i+1} = \gamma_{i} + (\alpha_{j} - \beta_{j}) s_{j}. */
-            vecadd(d, it->s, it->alpha - beta, n);
-            j = (j + 1) % m;        /* if (++j == m) j = 0; */
+            vecscale(d, ys / yy, n);
+
+            for (i = 0;i < bound;++i) {
+                it = &lm[j];
+                /* \beta_{j} = \rho_{j} y^t_{j} \cdot \gamma_{i}. */
+                vecdot(&beta, it->y, d, n);
+                beta /= it->ys;
+                /* \gamma_{i+1} = \gamma_{i} + (\alpha_{j} - \beta_{j}) s_{j}. */
+                vecadd(d, it->s, it->alpha - beta, n);
+                j = (j + 1) % m;          /* if (++j == m) j = 0; */
+            }
         }
 
         /*
@@ -632,6 +686,7 @@ int lbfgs(
             Now the search direction d is ready. We try step = 1 first.
          */
         step = 1.0;
+        ++k;
     }
 
 lbfgs_exit:
@@ -659,6 +714,9 @@ lbfgs_exit:
     vecfree(gp);
     vecfree(g);
     vecfree(xp);
+
+    vecfree(sk);
+    vecfree(yk);
 
     return ret;
 }
@@ -729,6 +787,12 @@ const char* lbfgs_strerror(int err)
 
         case LBFGSERR_INVALID_MAXLINESEARCH:
             return "Invalid parameter lbfgs_parameter_t::max_linesearch specified.";
+
+        case LBFGSERR_INVALID_CBFGS_EPSILON:
+            return "Invalid parameter lbfgs_parameter_t::cbfgs_epsilon specified.";
+
+        case LBFGSERR_INVALID_CBFGS_ALPHA:
+            return "Invalid parameter lbfgs_parameter_t::cbfgs_alpha specified.";
 
         case LBFGSERR_INVALID_ORTHANTWISE_C:
             return "Invalid parameter lbfgs_parameter_t::orthantwise_c specified.";

@@ -115,6 +115,10 @@ enum {
     LBFGSERR_INVALID_XTOL,
     /** Invalid parameter lbfgs_parameter_t::max_linesearch specified. */
     LBFGSERR_INVALID_MAXLINESEARCH,
+    /** Invalid parameter lbfgs_parameter_t::cbfgs_epsilon specified. */
+    LBFGSERR_INVALID_CBFGS_EPSILON,
+    /** Invalid parameter lbfgs_parameter_t::cbfgs_alpha specified. */
+    LBFGSERR_INVALID_CBFGS_ALPHA,
     /** Invalid parameter lbfgs_parameter_t::orthantwise_c specified. */
     LBFGSERR_INVALID_ORTHANTWISE_C,
     /** Invalid parameter lbfgs_parameter_t::orthantwise_w specified. */
@@ -319,6 +323,26 @@ typedef struct {
      *  of the interval of uncertainty is less than this parameter.
      */
     lbfgsfloatval_t xtol;
+
+    /**
+     * Coefficient for the cautious BFGS (C-BFGS) update rule.
+     *  This parameter must be a small positive number. At iteration k, the limited
+     *  BFGS memory update is skipped when the following condition is not satisfied:
+     *      y_k^T s_k >= \ref cbfgs_epsilon * ||g_k||^\ref cbfgs_alpha * ||s_k||^2,
+     *  where ||.|| denotes the Euclidean (L2) norm, s_k = x_{k+1} - x_k, and
+     *  y_k = g_{k+1} - g_k. The default value is \c 1e-6.
+     */
+    lbfgsfloatval_t cbfgs_epsilon;
+
+    /**
+     * Exponent for the cautious BFGS (C-BFGS) update rule.
+     *  This parameter must be a positive number. At iteration k, the limited
+     *  BFGS memory update is skipped when the following condition is not satisfied:
+     *      y_k^T s_k >= \ref cbfgs_epsilon * ||g_k||^\ref cbfgs_alpha * ||s_k||^2,
+     *  where ||.|| denotes the Euclidean (L2) norm, s_k = x_{k+1} - x_k, and
+     *  y_k = g_{k+1} - g_k. The default value is \c 1.0.
+     */
+    lbfgsfloatval_t cbfgs_alpha;
 
     /**
      * Coefficient for the L1 norm of variables.
