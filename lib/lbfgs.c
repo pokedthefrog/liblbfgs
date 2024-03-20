@@ -202,7 +202,7 @@ static void owlqn_pseudo_gradient(
     const lbfgsfloatval_t* x,
     const lbfgsfloatval_t* g,
     const int n,
-    const lbfgsfloatval_t c,
+    const lbfgsfloatval_t  c,
     const lbfgsfloatval_t* w,
     const int start,
     const int end
@@ -250,8 +250,8 @@ void lbfgs_parameter_init(lbfgs_parameter_t *param)
 
 int lbfgs(
     int n,
-    lbfgsfloatval_t *x,
-    lbfgsfloatval_t *ptr_fx,
+    lbfgsfloatval_t  *x,
+    lbfgsfloatval_t  *ptr_fx,
     lbfgs_evaluate_t proc_evaluate,
     lbfgs_progress_t proc_progress,
     void *instance,
@@ -268,9 +268,9 @@ int lbfgs(
 
     lbfgsfloatval_t *xp = NULL;
     lbfgsfloatval_t *g = NULL, *gp = NULL, *pg = NULL;
-    lbfgsfloatval_t *d = NULL, *w = NULL, *pf = NULL;
+    lbfgsfloatval_t *d = NULL, *w  = NULL, *pf = NULL;
     iteration_data_t *lm = NULL, *it = NULL;
-    lbfgsfloatval_t *sk = NULL, *yk = NULL;
+    lbfgsfloatval_t  *sk = NULL, *yk = NULL;
     lbfgsfloatval_t ys, yy, ss;
     lbfgsfloatval_t xnorm, gnorm, gpnorm, beta;
     lbfgsfloatval_t fx = 0., fp, rate;
@@ -391,10 +391,10 @@ int lbfgs(
 
     /* Allocate working space. */
     xp = (lbfgsfloatval_t*)vecalloc((size_t)n * sizeof(lbfgsfloatval_t));
-    g = (lbfgsfloatval_t*)vecalloc((size_t)n * sizeof(lbfgsfloatval_t));
+    g  = (lbfgsfloatval_t*)vecalloc((size_t)n * sizeof(lbfgsfloatval_t));
     gp = (lbfgsfloatval_t*)vecalloc((size_t)n * sizeof(lbfgsfloatval_t));
-    d = (lbfgsfloatval_t*)vecalloc((size_t)n * sizeof(lbfgsfloatval_t));
-    w = (lbfgsfloatval_t*)vecalloc((size_t)n * sizeof(lbfgsfloatval_t));
+    d  = (lbfgsfloatval_t*)vecalloc((size_t)n * sizeof(lbfgsfloatval_t));
+    w  = (lbfgsfloatval_t*)vecalloc((size_t)n * sizeof(lbfgsfloatval_t));
 
     sk = (lbfgsfloatval_t*)vecalloc((size_t)n * sizeof(lbfgsfloatval_t));
     yk = (lbfgsfloatval_t*)vecalloc((size_t)n * sizeof(lbfgsfloatval_t));
@@ -460,7 +460,7 @@ int lbfgs(
         we assume the initial hessian matrix H_0 as the identity matrix.
      */
     if (param.orthantwise_c == 0.) {
-        vecncpy(d, g, n);
+        vecncpy(d,  g, n);
     } else {
         vecncpy(d, pg, n);
     }
@@ -470,7 +470,7 @@ int lbfgs(
      */
     vec2norm(&xnorm, x, n);
     if (param.orthantwise_c == 0.) {
-        vec2norm(&gnorm, g, n);
+        vec2norm(&gnorm,  g, n);
     } else {
         vec2norm(&gnorm, pg, n);
     }
@@ -526,7 +526,7 @@ int lbfgs(
 
                 /* Set the steepest descent direction. */
                 if (param.orthantwise_c == 0.) {
-                    vecncpy(d, g, n);
+                    vecncpy(d,  g, n);
                 } else {
                     vecncpy(d, pg, n);
                 }
@@ -543,7 +543,7 @@ int lbfgs(
 
         gpnorm = gnorm;
         if (param.orthantwise_c == 0.) {
-            vec2norm(&gnorm, g, n);
+            vec2norm(&gnorm,  g, n);
         } else {
             vec2norm(&gnorm, pg, n);
         }
@@ -652,7 +652,7 @@ int lbfgs(
         /* Compute the steepest direction. */
         if (param.orthantwise_c == 0.) {
             /* Compute the negative of gradients. */
-            vecncpy(d, g, n);
+            vecncpy(d,  g, n);
         } else {
             vecncpy(d, pg, n);
         }
@@ -1545,7 +1545,7 @@ static void owlqn_pseudo_gradient(
     const lbfgsfloatval_t* x,
     const lbfgsfloatval_t* g,
     const int n,
-    const lbfgsfloatval_t c,
+    const lbfgsfloatval_t  c,
     const lbfgsfloatval_t* w,
     const int start,
     const int end
