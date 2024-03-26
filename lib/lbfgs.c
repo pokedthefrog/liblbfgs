@@ -405,7 +405,7 @@ int lbfgs(
     }
 
     if (param.orthantwise_c != 0.) {
-        /* Allocate working space for OW-LQN. */
+        /* Allocate working space for OWL-QN. */
         pg = (lbfgsfloatval_t*)vecalloc((size_t)n * sizeof(lbfgsfloatval_t));
         if (pg == NULL) {
             ret = LBFGSERR_OUTOFMEMORY;
