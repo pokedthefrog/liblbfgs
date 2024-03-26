@@ -66,6 +66,7 @@ licence.
 #endif/*HAVE_CONFIG_H*/
 
 #include <stdint.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -266,6 +267,10 @@ int lbfgs(
     lbfgs_parameter_t param = (_param != NULL) ? (*_param) : _defparam;
     const int m = param.m;
 
+    /* Handle (de-)allocation of param.orthantwise_w. */
+    int len_w;
+    bool free_w_on_exit = false;
+
     lbfgsfloatval_t *xp = NULL;
     lbfgsfloatval_t *g = NULL, *gp = NULL, *pg = NULL;
     lbfgsfloatval_t *d = NULL, *w  = NULL, *pf = NULL;
@@ -375,17 +380,12 @@ int lbfgs(
         }
     }
 
-    int len_w = param.orthantwise_end - param.orthantwise_start;
+    len_w = param.orthantwise_end - param.orthantwise_start;
     if (param.orthantwise_w != NULL) {
         for (i = 0;i < len_w;++i) {
             if (param.orthantwise_w[i] < 0.) {
                 return LBFGSERR_INVALID_ORTHANTWISE_W;
             }
-        }
-    } else {
-        param.orthantwise_w = (lbfgsfloatval_t*)vecalloc((size_t)len_w * sizeof(lbfgsfloatval_t));
-        for (i = 0;i < len_w;++i) {
-            param.orthantwise_w[i] = 1.0;
         }
     }
 
@@ -410,6 +410,23 @@ int lbfgs(
         if (pg == NULL) {
             ret = LBFGSERR_OUTOFMEMORY;
             goto lbfgs_exit;
+        }
+
+        /*
+            If no weights provided, set to an all-ones vector;
+            this will have to be freed on exit.
+         */
+        if (param.orthantwise_w == NULL) {
+            param.orthantwise_w = (lbfgsfloatval_t*)vecalloc((size_t)len_w * sizeof(lbfgsfloatval_t));
+            if (param.orthantwise_w == NULL) {
+                ret = LBFGSERR_OUTOFMEMORY;
+                goto lbfgs_exit;
+            }
+
+            for (i = 0;i < len_w;++i) {
+                param.orthantwise_w[i] = 1.0;
+            }
+            free_w_on_exit = true;
         }
     }
 
@@ -727,7 +744,9 @@ lbfgs_exit:
         vecfree(lm);
     }
 
-    vecfree(param.orthantwise_w);
+    if (free_w_on_exit) {
+        vecfree(param.orthantwise_w);
+    }
     vecfree(pg);
     vecfree(w);
 
